@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Grapevine</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="aboutproject"> "\t" As there is a lack of data-sets for vitriculture ( as opposed to other fields in priecision farming ), This project is a tool to collect annotated images of grapevines that will help us come up with better algortihms for pruning which requires a deep expertise that is hard to encode.</string>
+    <string name="aboutaim"> "\t" The data that will be gathered from this application can be used to help building expert systems,machine learning models,or frameworks for grapevine prunings</string>
+</resources>
