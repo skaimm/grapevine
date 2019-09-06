@@ -1,25 +1,33 @@
 package com.grapevine.grapevine.Models;
 
-import com.mysql.jdbc.Blob;
-
+import java.io.Serializable;
 import java.util.ArrayList;
 
-public class Tree {
+public class Tree implements Serializable {
 
     int treeid;
-    Blob timage;
+    String timage;
+    String cimage;
+    int personid;
     ArrayList<Branch> branches;
     ArrayList<Review> reviewList;
 
-    public Tree(int treeid, Blob timage, ArrayList<Branch> branches, ArrayList<Review> reviewList) {
+    public Tree(int treeid, String timage, String cimage, int personid, ArrayList<Branch> branches, ArrayList<Review> reviewList) {
         this.treeid = treeid;
         this.timage = timage;
+        this.cimage = cimage;
+        this.personid = personid;
         this.branches = branches;
         this.reviewList = reviewList;
     }
 
-    public  Tree(){
-
+    public Tree(int treeid, String timage, String cimage, int personid) {
+        this.treeid = treeid;
+        this.timage = timage;
+        this.cimage = cimage;
+        this.personid = personid;
+        this.branches = new ArrayList<>();
+        this.reviewList = new ArrayList<>();
     }
 
     public int getTreeid() {
@@ -30,11 +38,11 @@ public class Tree {
         this.treeid = treeid;
     }
 
-    public Blob getTimage() {
+    public String getTimage() {
         return timage;
     }
 
-    public void setTimage(Blob timage) {
+    public void setTimage(String timage) {
         this.timage = timage;
     }
 
@@ -42,8 +50,8 @@ public class Tree {
         return branches;
     }
 
-    public void setBranches(ArrayList<Branch> branches) {
-        this.branches = branches;
+    public void setBranches(Branch branch) {
+        this.branches.add(branch);
     }
 
     public ArrayList<Review> getReviewList() {
@@ -52,5 +60,21 @@ public class Tree {
 
     public void setReviewList(ArrayList<Review> reviewList) {
         this.reviewList = reviewList;
+    }
+
+    public String getCimage() {
+        return cimage;
+    }
+
+    public void setCimage(String cimage) {
+        this.cimage = cimage;
+    }
+
+    public int getPersonid() {
+        return personid;
+    }
+
+    public void setPersonid(int personid) {
+        this.personid = personid;
     }
 }

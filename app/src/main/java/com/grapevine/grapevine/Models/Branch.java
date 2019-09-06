@@ -1,9 +1,18 @@
 package com.grapevine.grapevine.Models;
 
+import android.annotation.SuppressLint;
+import android.os.Build;
+import android.os.Parcel;
+import android.os.Parcelable;
+import android.support.annotation.RequiresApi;
+
 import com.grapevine.grapevine.Models.Tree;
 
 import java.util.ArrayList;
+import java.util.Objects;
 
+
+@SuppressLint("ParcelCreator")
 public class Branch {
 
 
@@ -13,12 +22,12 @@ public class Branch {
     ArrayList<Coordinates> coordinates;
     ArrayList<Integer> children;
 
-    public Branch(int id, int parentid, int treeid, ArrayList<Coordinates> coordinates, ArrayList<Integer> children) {
+    public Branch(int id, int parentid, int treeid, ArrayList<Coordinates> coordinates) {
         this.id = id;
         this.parentid = parentid;
         this.treeid = treeid;
         this.coordinates = coordinates;
-        this.children = children;
+        this.children = new ArrayList<>();
     }
 
     public Branch(int id){
@@ -54,8 +63,8 @@ public class Branch {
         return coordinates;
     }
 
-    public void setCoordinates(ArrayList<Coordinates> coordinates) {
-        this.coordinates = coordinates;
+    public void setCoordinates(Coordinates coordinates) {
+        this.coordinates.add(coordinates);
     }
 
     public ArrayList<Integer> getChildren() {
@@ -64,5 +73,20 @@ public class Branch {
 
     public void setChildren(Integer children) {
         this.children.add(children);
+    }
+
+    public void setChildrenasArray(ArrayList<Integer> children) {
+        this.children = children;
+    }
+
+    @Override
+    public String toString() {
+        return "Branch{" +
+                "id=" + id +
+                ", parentid=" + parentid +
+                ", treeid=" + treeid +
+                ", coordinates=" + coordinates +
+                ", children=" + children +
+                '}';
     }
 }

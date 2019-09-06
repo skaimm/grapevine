@@ -6,7 +6,7 @@ public class Pruning {
     int y;
     int treeid;
 
-    public Pruning(int x, int y, int treeid, Person personid) {
+    public Pruning(int x, int y, int treeid) {
         this.x = x;
         this.y = y;
         this.treeid = treeid;

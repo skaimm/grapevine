@@ -1,6 +1,11 @@
 package com.grapevine.grapevine.Models;
 
-public class Review {
+import android.os.Parcel;
+import android.os.Parcelable;
+
+import java.io.Serializable;
+
+public class Review implements Parcelable {
 
     int userid;
     String comment;
@@ -13,10 +18,9 @@ public class Review {
         this.importance = importance;
         this.treeid = treeid;
     }
-    public Review(int userid,int treeid){
-        this.userid = userid;
-        this.treeid = treeid;
+    public Review(){
     }
+
 
     public int getUserid() {
         return userid;
@@ -49,4 +53,35 @@ public class Review {
     public void setTreeid(int treeid) {
         this.treeid = treeid;
     }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel parcel, int i) {
+        parcel.writeInt(userid);
+        parcel.writeInt(importance);
+        parcel.writeInt(treeid);
+        parcel.writeString(comment);
+    }
+
+    public Review(Parcel in){
+        userid = in.readInt();
+        importance = in.readInt();
+        treeid = in.readInt();
+        comment = in.readString();
+    }
+    public static final Parcelable.Creator<Review> CREATOR = new Parcelable.Creator<Review>()
+    {
+        public Review createFromParcel(Parcel in)
+        {
+            return new Review(in);
+        }
+        public Review[] newArray(int size)
+        {
+            return new Review[size];
+        }
+    };
 }

@@ -28,18 +28,6 @@
             <TextView
                 android:id="@+id/loadinfo"
                 android:padding="5dp"
-
-
-
-
-
-
-
-
-
-
-
-
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:text="No File Choosen"
@@ -156,10 +144,7 @@
 
             </ListView>
 
-
         </LinearLayout>
-
-
 
     </LinearLayout>
 

@@ -6,6 +6,8 @@
     <color name="red">#c4040a</color>
     <color name="white">#fff</color>
     <color name="black">#000</color>
+    <color name="lightblue">#24c4b9</color>
+    <color name="logintextback">#1e9c9fb9</color>
 
     <color name="showcaseback">#3F51B5</color>
 </resources>

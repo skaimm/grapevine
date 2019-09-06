@@ -1,18 +1,21 @@
 package com.grapevine.grapevine.Models;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
 public class Coordinates {
 
-    float x;
-    float y;
+    int x;
+    int y;
     int brancdid;
 
-    public Coordinates(float x, float y, int brancdid) {
+    public Coordinates(int x, int y, int brancdid) {
         this.x = x;
         this.y = y;
         this.brancdid = brancdid;
     }
 
-    public float getX() {
+    public int getX() {
         return x;
     }
 
@@ -20,7 +23,7 @@ public class Coordinates {
         this.x = x;
     }
 
-    public float getY() {
+    public int getY() {
         return y;
     }
 
@@ -35,4 +38,5 @@ public class Coordinates {
     public void setBrancdid(int brancdid) {
         this.brancdid = brancdid;
     }
+
 }

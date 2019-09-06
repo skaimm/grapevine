@@ -2,8 +2,9 @@ package com.grapevine.grapevine;
 
 
 import android.annotation.SuppressLint;
+import android.app.ProgressDialog;
 import android.content.Intent;
-import android.content.res.Resources;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -13,21 +14,21 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
-import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.location.Location;
-import android.media.Image;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Parcelable;
+import android.preference.PreferenceManager;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.Fragment;
-import android.text.Layout;
-import android.text.TextPaint;
-import android.util.Log;
+import android.util.Base64;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -38,41 +39,32 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.RelativeLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 
-import com.android.volley.AuthFailureError;
-import com.android.volley.RequestQueue;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
-import com.android.volley.toolbox.StringRequest;
-import com.android.volley.toolbox.Volley;
 import com.github.amlcurran.showcaseview.ShowcaseView;
-import com.github.amlcurran.showcaseview.targets.ActionViewTarget;
-import com.github.amlcurran.showcaseview.targets.ViewTarget;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.grapevine.grapevine.Models.Branch;
 import com.grapevine.grapevine.Models.Coordinates;
-import com.grapevine.grapevine.Models.Review;
 import com.grapevine.grapevine.Models.Tree;
-import com.android.volley.Request;
+import com.grapevine.grapevine.Utils.ConnectionClass;
+import com.grapevine.grapevine.Utils.PreferenceUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
-import java.io.InputStream;
-import java.net.URL;
+import java.lang.reflect.Type;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
-import java.util.Stack;
 
 import static android.app.Activity.RESULT_OK;
-
+import static android.content.Context.MODE_PRIVATE;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -87,21 +79,21 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
     LinearLayout layoutopvis;
     Canvas newCanvas;
     Paint paint;
-    Path path;
     ArrayAdapter<Integer> spadapter;
     ArrayAdapter lvadapter;
     final int RQS_IMAGE = 1;
     Uri source1;
-    int userID=1;
-    byte[] blob;
+    int userID;
+    Bitmap newBitmap;
 
-    ArrayList<String> lvcontent = new ArrayList<>();
-    ArrayList<Integer> numberss = new ArrayList<>();
+    ArrayList<String> lvcontent;
+    ArrayList<Integer> numberss;
     ArrayList<Coordinates> coord = new ArrayList<>();
+    ArrayList<Bitmap> savedCanvas;
+    ArrayList<Branch> branches;
     int branchid = 0;
-    ArrayList<Branch> branches = new ArrayList<>();
     int treeid= 0;
-    ArrayList<Tree> trees = new ArrayList<>();
+    public Tree tree;
 
     Branch branch;
     int selected=-1;
@@ -117,6 +109,10 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
         // Inflate the layout for this fragment
         final View rootView = inflater.inflate(R.layout.fragment_annotation, container, false);
 
+        if(getArguments()!=null){
+            userID = getArguments().getInt("userid");
+        }
+
         load = rootView.findViewById(R.id.load);
         sbranch = rootView.findViewById(R.id.branch);
         fbranch = rootView.findViewById(R.id.finbranch);
@@ -130,6 +126,7 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
         isource = rootView.findViewById(R.id.isource);
         layoutopvis = rootView.findViewById(R.id.lloption);
 
+        loadData();
         load.setOnClickListener(this);
 
         spadapter = new ArrayAdapter<Integer>(getActivity(),android.R.layout.simple_spinner_item,numberss);
@@ -142,8 +139,13 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
         listView.setAdapter(lvadapter);
 
 
-        return rootView;
+        amarker.setOnClickListener(this);
+        rmarker.setOnClickListener(this);
+        fbranch.setOnClickListener(this);
+        sbranch.setOnClickListener(this);
+        sub.setOnClickListener(this);
 
+        return rootView;
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -201,7 +203,7 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
                 case RQS_IMAGE:
                     source1 = data.getData();
                     tinfo.setText(uritofilename(source1));
-                    isource.setImageBitmap(ProcessingBitmap());
+                    isource.setImageBitmap(ProcessingBitmap(null));
                     layoutopvis.setVisibility(View.VISIBLE);
 
                     rmarker.setEnabled(false);
@@ -209,18 +211,16 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
                     sbranch.setEnabled(true);
                     sub.setEnabled(false);
 
-                    amarker.setOnClickListener(this);
-                    rmarker.setOnClickListener(this);
-                    fbranch.setOnClickListener(this);
-                    sbranch.setOnClickListener(this);
-                    sub.setOnClickListener(this);
-
                     break;
             }
         }
     }
 
     private void createBranch(){
+
+        lvcontent.clear();
+        lvadapter.notifyDataSetChanged();
+
         //create new branch with branchid and push it to branches list
         branch = new Branch(branchid);
         branches.add(branch);
@@ -234,6 +234,7 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
         isource.setEnabled(true);
         sbranch.setEnabled(false);
         sub.setEnabled(false);
+
     }
 
     private void addCoordinates(){
@@ -271,7 +272,6 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
     }
 
     private void addBranch(){
-
         // draw line between coordinates
 
         paint.setStrokeWidth(10);
@@ -291,8 +291,9 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
         paint.setColor(getRandomColor());
 
         // set coordinates to branch
-
-        branch.setCoordinates(coord);
+        for(int i = 0; i<coord.size();i++){
+            branch.setCoordinates(coord.get(i));
+        }
         //branch.setChildren();
 
         // set parentid for branch and childrenid for its parents
@@ -300,27 +301,29 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
             int parentid = selected;
             branch.setParentid(parentid);
 
-            for(int i=0;i<branches.size();i++){
-                if(branches.get(i).getId()== parentid){
-                    branches.get(i).setChildren(branchid);
-                }
-            }
         }else{
             int parentid = -1;
             branch.setParentid(parentid);
         }
 
+        // save the canvas of branch
+        Bitmap willsave = newBitmap.copy(newBitmap.getConfig(),true);
+        savedCanvas.add(willsave);
+
         // add bancid to spinner to choose parent for next branch
         numberss.add(branchid);
         spadapter.notifyDataSetChanged();
 
+        branchid++;
+
+
+        SaveData saveData = new SaveData(lvcontent,branches);
+        saveData.execute();
+
         //clear coordinates and listview
         coord.clear();
-        lvcontent.clear();
-        lvadapter.notifyDataSetChanged();
 
         // inrease the branchid for new one
-        branchid++;
 
         //set buttons to click or not
         isource.setEnabled(false);
@@ -332,11 +335,24 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
 
     private void createTree() throws SQLException {
 
-        Tree tree = new Tree();
-        tree.setTreeid(treeid);
-        tree.setBranches(branches);
+        tree = new Tree(treeid,getStringFromBitmap(savedCanvas.get(0)),
+                getStringFromBitmap(savedCanvas.get(savedCanvas.size()-1)),userID);
 
-        trees.add(tree);
+        for(int i=0;i<branches.size();i++){
+            int parentid = branches.get(i).getParentid();
+            for(int j=0;j<branches.size();j++){
+                if(branches.get(j).getId()== parentid){
+                    branches.get(j).setChildren(branches.get(i).getId());
+                }
+            }
+        }
+        for(int i = 0; i<branches.size();i++){
+            tree.setBranches(branches.get(i));
+        }
+
+        SaveTask saveTask = new SaveTask();
+        saveTask.execute();
+
         int startparentid=-1;
         ArrayList<Integer> parents=new ArrayList<>();
         recursive(startparentid,parents);
@@ -351,14 +367,9 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
         fbranch.setEnabled(false);
         sub.setEnabled(false);
         parentspin.setEnabled(false);
+        load.setEnabled(true);
 
-        ConnectionClass connectionClass = new ConnectionClass();
-        Connection con = connectionClass.CONN();
-        String query = "INSERT INTO trees(personID,Image,Canvas) VALUES ('"+userID+"','"+blob+"','"+blob+"')";
-        Statement stmt = con.createStatement();
-        stmt.executeUpdate(query);
-        con.close();
-
+        restoreData();
     }
 
 
@@ -375,12 +386,12 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
     @SuppressLint("DefaultLocale")
     @Override
     public boolean onTouch(View view, MotionEvent motionEvent) {
-        float x = motionEvent.getX();
-        float y = motionEvent.getY();
+        int x = (int) motionEvent.getX();
+        int y = (int) motionEvent.getY();
         newCanvas.drawCircle(x,y,10,paint);
         Coordinates coordinates = new Coordinates(x,y,branchid);
         coord.add(coordinates);
-        lvcontent.add("X = "+ String.format("%.2f", x) + "Y = " + String.format("%.2f",y));
+        lvcontent.add("X = "+ String.valueOf(x) +" "+ "Y = " + String.valueOf(y));
         lvadapter.notifyDataSetChanged();
 
         isource.invalidate();
@@ -391,6 +402,7 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
         if(coord.size()>1){
             fbranch.setEnabled(true);
         }
+
         return false;
     }
 
@@ -413,29 +425,35 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
     }
 
     // convert bitmap to make available for canvas
+    @SuppressLint("NewApi")
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
-    private Bitmap ProcessingBitmap(){
+    private Bitmap ProcessingBitmap(Bitmap bitmap){
         Bitmap bm1 = null;
-        Bitmap newBitmap = null;
+        newBitmap = null;
 
-        try {
-            bm1 =BitmapFactory.decodeStream(getContext().getContentResolver().openInputStream(source1));
+        if(bitmap==null){
+            try {
+                bm1 =BitmapFactory.decodeStream(Objects.requireNonNull(getContext()).getContentResolver().openInputStream(source1));
 
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
         }
 
+        if(bm1==null){
+            bm1 = bitmap;
+        }
         Bitmap.Config config = bm1.getConfig();
         if(config ==null){
             config = Bitmap.Config.ARGB_8888;
         }
-
         newBitmap = Bitmap.createBitmap(bm1.getWidth(),bm1.getHeight(),config);
 
         Drawable d = new BitmapDrawable(getResources(), bm1);
         isource.setBackground(d);
 
-        blob = getBytesFromBitmap(newBitmap);
+        savedCanvas.add(bm1);
+
         newCanvas = new Canvas(newBitmap);
         newCanvas.drawBitmap(bm1,0,0,null);
 
@@ -486,9 +504,11 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
             }
         }
         if(branches.size()>0){
-            parentid = backparent.get(backparent.size()-1);
-            backparent.remove(backparent.size()-1);
-            recursive(parentid,backparent);
+            if(backparent.size()>0){
+                parentid = backparent.get(backparent.size()-1);
+                backparent.remove(backparent.size()-1);
+                recursive(parentid,backparent);
+            }
         }
     }
 
@@ -521,12 +541,204 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
         lvadapter.notifyDataSetChanged();
     }
 
-    public static byte[] getBytesFromBitmap(Bitmap bitmap) {
+    public static String getStringFromBitmap(Bitmap bitmap) {
         if (bitmap!=null) {
+
             ByteArrayOutputStream stream = new ByteArrayOutputStream();
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, stream);
-            return stream.toByteArray();
+            bitmap.compress(Bitmap.CompressFormat.PNG, 80, stream);
+            byte[] imgByte = stream.toByteArray();
+            return Base64.encodeToString(imgByte,Base64.DEFAULT);
         }
         return null;
     }
+
+    private Bitmap getBitmapFromString(String stringPicture) {
+        byte[] decodedString = Base64.decode(stringPicture, Base64.DEFAULT);
+        Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
+        return decodedByte;
+    }
+
+    @SuppressLint("StaticFieldLeak")
+    public class SaveTask extends AsyncTask<String, String, Void> {
+        ConnectionClass connectionClass = new ConnectionClass();
+
+        @Override
+        protected Void doInBackground(String... strings) {
+            try {
+                Connection con = connectionClass.CONN();
+                if(con==null){
+                }else {
+
+                    String query = "INSERT INTO trees(personID,Image,Canvas) VALUES ('"+userID+"','"+tree.getTimage()+"','"+tree.getCimage()+"')";
+
+                    Statement stmt = con.createStatement();
+                        stmt.executeUpdate(query);
+
+                    String query2="SELECT * FROM trees WHERE personID = '"+userID+"' and Canvas = '"+tree.getCimage()+"'";
+                    Statement stmt2 = con.createStatement();
+                    ResultSet rs = stmt2.executeQuery(query2);
+                    int treeid = 0;
+                    while (rs.next()){
+                        treeid = rs.getInt(1);
+                    }
+                    tree.setTreeid(treeid);
+
+
+                    for(int i=0;i<tree.getBranches().size();i++){
+                        query = "INSERT INTO branches(parentID,treeID) VALUES ('"+tree.getBranches().get(i).getParentid()+"','"+tree.getTreeid()+"')";
+                        stmt.executeUpdate(query);
+
+                        String query3="SELECT * FROM branches WHERE treeID = '"+tree.getTreeid()+"' and parentID = '"+tree.getBranches().get(i).getParentid()+"'";
+                        Statement stmt3 = con.createStatement();
+                        ResultSet rs2 = stmt3.executeQuery(query3);
+
+                        int branchid = 0;
+                        while (rs2.next()){
+                            branchid = rs2.getInt(1);
+                        }
+                        tree.getBranches().get(i).setId(branchid);
+
+                        for(int j=0;j < tree.getBranches().get(i).getCoordinates().size();j++){
+                            query = "INSERT INTO coordinates(x,y,branchID) VALUES ('"+tree.getBranches().get(i).getCoordinates().get(j).getX()+"'," +
+                                    "'"+tree.getBranches().get(i).getCoordinates().get(j).getY()+"','"+tree.getBranches().get(i).getId()+"')";
+                            stmt.executeUpdate(query);
+                        }
+                    }
+                    con.close();
+                }
+            }catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void aVoid) {
+            super.onPostExecute(aVoid);
+        }
+    }
+
+    @SuppressLint("StaticFieldLeak")
+    public class SaveData extends AsyncTask<String, String, Void> {
+        ArrayList<String> newContent;
+        ArrayList<Branch> newBranches;
+        public SaveData(ArrayList<String> lvcontent, ArrayList<Branch> branches) {
+            this.newContent = new ArrayList<>();
+            this.newContent.addAll(lvcontent);
+            this.newBranches = new ArrayList<>();
+            this.newBranches.addAll(branches);
+
+        }
+
+        @Override
+        protected Void doInBackground(String... strings) {
+            SharedPreferences sharedPreferences = getContext().getSharedPreferences("shared preferences",MODE_PRIVATE);
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            Gson gson = new Gson();
+
+            ArrayList<String> stringBitmaps= new ArrayList<>(); //stringBranch = new ArrayList<>();
+
+            for(int i=0;i<savedCanvas.size();i++){
+                //if(i<savedCanvas.size()){
+                    String bitmap = getStringFromBitmap(savedCanvas.get(i));
+                    stringBitmaps.add(bitmap);
+               // }
+              /*  if(i<branches.size()){
+                    String branch = branches.get(i).toString();
+                    stringBranch.add(branch);
+                }*/
+            }
+
+
+            String jsonbrances = gson.toJson(newBranches);
+            String jsoncanvas = gson.toJson(stringBitmaps);
+            String jsonnumber = gson.toJson(numberss);
+            String jsoncontent = gson.toJson(newContent);
+
+            editor.putInt("branchid",branchid);
+            editor.putString("branch",jsonbrances);
+            editor.putString("numberss",jsonnumber);
+            editor.putString("lvcontent",jsoncontent);
+            editor.putString("savedCanvas",jsoncanvas);
+            editor.apply();
+
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void aVoid) {
+            super.onPostExecute(aVoid);
+        }
+    }
+
+
+    private void restoreData(){
+        SharedPreferences sharedPreferences = getContext().getSharedPreferences("shared preferences",MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putInt("branchid",0);
+        editor.putString("branch",null);
+        editor.putString("savedCanvas",null);
+        editor.putString("numberss",null);
+        editor.putString("lvcontent",null);
+        editor.apply();
+    }
+
+
+    @SuppressLint("NewApi")
+    private void loadData(){
+        SharedPreferences sharedPreferences = getContext().getSharedPreferences("shared preferences",MODE_PRIVATE);
+        Gson gson = new Gson();
+        String jsonBranch = sharedPreferences.getString("branch",null);
+        String jsonCanvas = sharedPreferences.getString("savedCanvas",null);
+        String jsonNumbers = sharedPreferences.getString("numberss",null);
+        String jsonContent = sharedPreferences.getString("lvcontent",null);
+
+        branchid = sharedPreferences.getInt("branchid",0);
+        if(branchid!=0){
+
+            ArrayList<String> stringBitmap;//,stringBranch = new ArrayList<>();
+            savedCanvas = new ArrayList<>();
+
+            Type type = new TypeToken<ArrayList<Branch>>() {}.getType();
+            branches = gson.fromJson(jsonBranch,type);
+
+            Type type2 = new TypeToken<ArrayList<String>>() {}.getType();
+            stringBitmap = gson.fromJson(jsonCanvas,type2);
+            for(int i=0;i<stringBitmap.size();i++) { //|| i<stringBranch.size();i++){
+                //   if(i<stringBitmap.size())
+                savedCanvas.add(getBitmapFromString(stringBitmap.get(i)));
+                // if(i<stringBitmap.size())
+                //   branches.add(stringBranch.get(i));
+
+            }
+            Type type3 = new TypeToken<ArrayList<Integer>>() {}.getType();
+            numberss = gson.fromJson(jsonNumbers,type3);
+            Type type4 = new TypeToken<ArrayList<String>>() {}.getType();
+            lvcontent = gson.fromJson(jsonContent,type4);
+        }
+
+        if(branches == null){
+            branches = new ArrayList<>();
+        }else{
+        }
+        if(savedCanvas == null){
+            savedCanvas = new ArrayList<>();
+        }else{
+            layoutopvis.setVisibility(View.VISIBLE);
+            load.setEnabled(false);
+            sub.setEnabled(true);
+            rmarker.setEnabled(false);
+            amarker.setEnabled(true);
+            sbranch.setEnabled(true);
+            fbranch.setEnabled(false);
+            isource.setImageBitmap(ProcessingBitmap(savedCanvas.get(savedCanvas.size()-1)));
+        }
+        if(numberss == null){
+            numberss = new ArrayList<>();
+        }
+        if(lvcontent == null){
+            lvcontent = new ArrayList<>();
+        }
+    }
+
 }
