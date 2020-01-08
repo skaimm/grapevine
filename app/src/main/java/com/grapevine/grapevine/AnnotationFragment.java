@@ -136,6 +136,7 @@ public class AnnotationFragment extends Fragment implements AdapterView.OnItemSe
         parentspin.setOnItemSelectedListener(this);
 
         lvadapter = new ArrayAdapter<String>(getActivity(),android.R.layout.simple_list_item_1,lvcontent);
+        lvadapter = new ArrayAdapter<String>(getActivity(),android.R.layout.simple_list_item_1,lvcontent);
         listView.setAdapter(lvadapter);
 
 
